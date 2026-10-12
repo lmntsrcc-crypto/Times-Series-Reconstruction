@@ -113,14 +113,17 @@ function [net,Y_mod,stats,structs] = modelohibrido(file, C, g)
     net.layers{3}.transferFcn
     net.layers{4}.transferFcn
     net.performFcn = 'mse';
-    net.divideFcn = 'dividetrain';
+    net.divideFcn = 'dividerand';
+    net.divideParam.trainRatio = 0.70;
+    net.divideParam.valRatio   = 0.15;
+    net.divideParam.testRatio  = 0.15;
     net.trainParam.max_fail = 10;
     net.trainParam.epochs   = 1000;
     net.trainParam.min_grad = 1e-7;
 
     % Entrenamiento de la red
 
-    [net, ~] = train(net, Xtrain', Ytrain');
+    [net, tr] = train(net, Xtrain', Ytrain');
 
     % Predecimos para todas las entradas (incluso donde la salida es NAN)
 
@@ -134,16 +137,17 @@ function [net,Y_mod,stats,structs] = modelohibrido(file, C, g)
 
     % Calculamos las métricas de desempeño.
     
-    e = Y_mod(valid) - Y(valid);
+    testInd = tr.testInd;
+    Ytrue = Ytrain(testInd);
+    Ypred = net(Xtrain(testInd,:)')';
+    e = Ypred - Ytrue;
     RMSE = sqrt(mean(e.^2));
-    MAE  = mean(abs(e));
-    nTotal = numel(Y);
-    nNaN   = sum(~valid);   
-    Ytrue = Y(valid);
-    Ypred = Y_mod(valid);
-    SS_res = sum( (Ytrue - Ypred).^2 );
-    SS_tot = sum( (Ytrue - mean(Ytrue)).^2 );
+    MAE = mean(abs(e));
+    SS_res = sum((Ytrue - Ypred).^2);
+    SS_tot = sum((Ytrue - mean(Ytrue)).^2);
     R2 = 1 - SS_res / SS_tot;
+    nTotal = numel(Y);
+    nNaN   = sum(~valid);
     
     % Calculamos las estructuras temporales de la serie de tiempo
     % original y de la imputación.
